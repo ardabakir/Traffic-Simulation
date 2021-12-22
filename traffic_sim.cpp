@@ -102,6 +102,7 @@ int main(int argc, char **argv){
     pthread_create(&laneThreads[2],NULL,defaultLane,(void *)SOUTH);
     pthread_create(&laneThreads[3],NULL,defaultLane,(void *)WEST);
     
+    
 
     while(duration < sim_time){
         pthread_mutex_lock(&street);
@@ -109,17 +110,23 @@ int main(int argc, char **argv){
             prev_sec = ++sec * CLOCKS_PER_SEC; 
 
             if(time_stamp == sec){
-                cout << "one second passed" <<endl;
+                time_t currTime = time(0);
+                string c_time = asctime(localtime(&currTime));
+                cout << c_time.substr(11, 18) <<endl;
                 cout<<"   "<<northQueue.size()<<endl;
                 cout<<westQueue.size()<<"     "<<eastQueue.size()<<endl;
                 cout<<"   "<<southQueue.size()<<endl;
             }else if(time_stamp + 1 == sec){
-                cout << "one second passed" <<endl;
+                time_t currTime = time(0);
+                string c_time = asctime(localtime(&currTime));
+                cout << c_time.substr(11, 18) <<endl;
                 cout<<"   "<<northQueue.size()<<endl;
                 cout<<westQueue.size()<<"     "<<eastQueue.size()<<endl;
                 cout<<"   "<<southQueue.size()<<endl;
             }else if(time_stamp + 2 == sec){
-                cout << "one second passed" <<endl;
+                time_t currTime = time(0);
+                string c_time = asctime(localtime(&currTime));
+                cout << c_time.substr(11, 18) <<endl;
                 cout<<"   "<<northQueue.size()<<endl;
                 cout<<westQueue.size()<<"     "<<eastQueue.size()<<endl;
                 cout<<"   "<<southQueue.size()<<endl;
@@ -127,7 +134,6 @@ int main(int argc, char **argv){
 
         }
         
-
         duration = (clock() - start ) / (double) CLOCKS_PER_SEC;
         pthread_mutex_unlock(&street);
     }
@@ -206,7 +212,18 @@ void *defaultLane(void *lane){
 }
 
 void *police(void*){
-    cout << "police thread running" << endl;
+
+    FILE* carFile;
+    carFile = fopen("car.log","w");
+    fprintf(carFile, "\tCarID \t Direction \t Arrival-Time \t Cross-Time \t Wait-Time \n");
+    fprintf(carFile, "------------------------------------------------------------------------\n");
+
+    FILE* policeFile;
+    policeFile = fopen("police.log","w");
+    fprintf(policeFile, "\tTime \t Event\n");
+    fprintf(policeFile, "-------------------------\n");
+    
+
     bool laneEmpty = false;
     int max = 0;
     int busyLane = 0;
@@ -231,11 +248,18 @@ void *police(void*){
         int prev = carID;
         
         if(max == 0){
-            cout << "phone" << endl;
+            time_t curr = time(0);
+            string c_time = asctime(localtime(&curr));
+            
+            fprintf(policeFile,"%s \t Phone \n", c_time.substr(11,18).c_str());
             while(prev == carID){
                 pthread_cond_wait(&carArrive,&cars);
             }
-            cout << "car came" << endl;
+            
+            curr = time(0);
+            c_time = asctime(localtime(&curr));
+            
+            fprintf(policeFile,"%s \t Phone \n", c_time.substr(11,18).c_str());
             pthread_sleep(3);
         }
         pthread_mutex_unlock(&cars);
@@ -244,11 +268,13 @@ void *police(void*){
             if(northQueue.size() > 0){
                 Car car = northQueue.front();
                 car.departure = time(0);
+                time_t wait_time = car.departure - car.arrival;
+                string ar_time = asctime(localtime(&car.arrival));
+                string dep_time = asctime(localtime(&car.departure));
+                fprintf(carFile,"\t %d \t N \t %s \b %s \b\t %d \n", car.id, ar_time.substr(11,18).c_str(),dep_time.substr(11,18).c_str(),(int)wait_time);
+
                 northQueue.pop();
-                cout<<"car passed from north"<< endl;
-                
                 if(northQueue.size() == 0){
-                    cout<<"north empty"<<endl;
                     laneEmpty = true;
                 }else{
                     laneEmpty = false;
@@ -258,11 +284,16 @@ void *police(void*){
         }
         else if(laneNum == 1){
             if(eastQueue.size() > 0){
+                Car car = eastQueue.front();
+                car.departure = time(0);
+                time_t wait_time = car.departure - car.arrival;
+                string ar_time = asctime(localtime(&car.arrival));
+                string dep_time = asctime(localtime(&car.departure));
+                fprintf(carFile,"\t %d \t E \t %s \t %s \t %d \n", car.id, ar_time.substr(11,18).c_str(),dep_time.substr(11,18).c_str(),(int)wait_time);
+
                 eastQueue.pop();
-                cout<<"car passed from east"<<endl;
                 
                 if(eastQueue.size() == 0){
-                    cout<<"east empty"<<endl;
                     laneEmpty = true;
                 }else{
                     laneEmpty = false;
@@ -272,10 +303,15 @@ void *police(void*){
         }
         else if(laneNum == 2){
             if(southQueue.size() > 0){
+                Car car = southQueue.front();
+                car.departure = time(0);
+                time_t wait_time = car.departure - car.arrival;
+                string ar_time = asctime(localtime(&car.arrival));
+                string dep_time = asctime(localtime(&car.departure));
+                fprintf(carFile,"\t %d \t S \t %s \t %s \t %d \n", car.id, ar_time.substr(11,18).c_str(),dep_time.substr(11,18).c_str(),(int)wait_time);
+
                 southQueue.pop();
-                cout<<"car passed from south"<<endl;
                 if(southQueue.size() == 0){
-                    cout<<"south empty"<<endl;
                     laneEmpty = true;
                 }else{
                     laneEmpty = false;
@@ -285,11 +321,16 @@ void *police(void*){
         }
         else if(laneNum == 3){
             if(westQueue.size() > 0){
+                Car car = westQueue.front();
+                car.departure = time(0);
+                time_t wait_time = car.departure - car.arrival;
+                string ar_time = asctime(localtime(&car.arrival));
+                string dep_time = asctime(localtime(&car.departure));
+                fprintf(carFile,"\t %d \t W \t %s \t %s \t %d \n", car.id, ar_time.substr(11,18).c_str(),dep_time.substr(11,18).c_str(),(int)wait_time);
+
                 westQueue.pop();
-                cout<<"car passed from west"<<endl;
                 if(westQueue.size() == 0){
                     laneEmpty = true;
-                    cout<<"west empty"<<endl;
                 }else{
                     laneEmpty = false;
                 }
