@@ -14,7 +14,7 @@ pthread_t laneThreads[NUM_THREADS-1];
 pthread_t policeThread;
 pthread_mutex_t street;
 pthread_mutex_t cars;
-pthread_cond_t condition;
+pthread_cond_t carArrive;
 pthread_attr_t attributes;
 
 enum lane{NORTH,EAST,SOUTH,WEST}; // 0,1,2,3
@@ -35,7 +35,9 @@ struct Car{
     std::queue<Car> westQueue;
 
 int sim_time = 10;
-    double probability = 0;
+double probability = 0;
+int time_stamp = 10;
+
 void* defaultLane(void* lane);
 void* police(void*);
 using namespace std;
@@ -57,6 +59,8 @@ int main(int argc, char **argv){
         else if(strcmp(argv[i],"-p")==0){
             char* temp = argv[i+1];
             probability = strtod(temp,NULL);
+        }else if(strcmp(argv[i],"-t")==0){
+            time_stamp = atoi(argv[i+1]);
         }
     }
     Car car0;
@@ -90,6 +94,7 @@ int main(int argc, char **argv){
 
     cout << "sim_time: " << sim_time << endl;
     cout << "probability: " << probability << endl;
+    cout << time_stamp << endl;
 
     pthread_create(&policeThread,NULL,police,NULL);
     pthread_create(&laneThreads[0],NULL,defaultLane,(void *)NORTH);
@@ -102,10 +107,24 @@ int main(int argc, char **argv){
         pthread_mutex_lock(&street);
         if( clock() - prev_sec > CLOCKS_PER_SEC) {
             prev_sec = ++sec * CLOCKS_PER_SEC; 
-            cout << "one second passed" <<endl;
-            cout<<"   "<<northQueue.size()<<endl;
-            cout<<westQueue.size()<<"      "<<eastQueue.size()<<endl;
-            cout<<"   "<<southQueue.size()<<endl;
+
+            if(time_stamp == sec){
+                cout << "one second passed" <<endl;
+                cout<<"   "<<northQueue.size()<<endl;
+                cout<<westQueue.size()<<"     "<<eastQueue.size()<<endl;
+                cout<<"   "<<southQueue.size()<<endl;
+            }else if(time_stamp + 1 == sec){
+                cout << "one second passed" <<endl;
+                cout<<"   "<<northQueue.size()<<endl;
+                cout<<westQueue.size()<<"     "<<eastQueue.size()<<endl;
+                cout<<"   "<<southQueue.size()<<endl;
+            }else if(time_stamp + 2 == sec){
+                cout << "one second passed" <<endl;
+                cout<<"   "<<northQueue.size()<<endl;
+                cout<<westQueue.size()<<"     "<<eastQueue.size()<<endl;
+                cout<<"   "<<southQueue.size()<<endl;
+            }
+
         }
         
 
@@ -119,7 +138,7 @@ int main(int argc, char **argv){
 
 void addCar(int lane){
     Car car;
-    pthread_mutex_lock(&cars);
+    pthread_mutex_lock(&street);
     car.id = carID;
     car.arrival = time(0);
     if(lane==0 ){
@@ -127,6 +146,7 @@ void addCar(int lane){
             carID++;
             car.lane = NORTH;
             northQueue.push(car);
+            pthread_cond_signal(&carArrive);
         }else{
             pthread_sleep(19);
         }
@@ -135,21 +155,24 @@ void addCar(int lane){
             carID++;
             car.lane = EAST;
             eastQueue.push(car);
+            pthread_cond_signal(&carArrive);
         }
     }else if(lane == 2 ){
         if((double)rand() / (double)RAND_MAX<probability){
             carID++;
             car.lane = SOUTH;
             southQueue.push(car);
+            pthread_cond_signal(&carArrive);
         }
     }else if(lane == 3){
         if((double)rand() / (double)RAND_MAX<probability){
             carID++;
             car.lane = WEST;
             westQueue.push(car);
+            pthread_cond_signal(&carArrive);
         }
     }
-    pthread_mutex_unlock(&cars);
+    pthread_mutex_unlock(&street);
 }
 
 using namespace std;
@@ -204,6 +227,18 @@ void *police(void*){
     int laneNum = busyLane;
     while(true){
        
+        pthread_mutex_lock(&cars);
+        int prev = carID;
+        
+        if(max == 0){
+            cout << "phone" << endl;
+            while(prev == carID){
+                pthread_cond_wait(&carArrive,&cars);
+            }
+            cout << "car came" << endl;
+            pthread_sleep(3);
+        }
+        pthread_mutex_unlock(&cars);
         pthread_mutex_lock(&street);
         if(laneNum == 0){
             if(northQueue.size() > 0){
@@ -219,7 +254,7 @@ void *police(void*){
                     laneEmpty = false;
                 }
                 pthread_sleep(1);
-            }  
+            }
         }
         else if(laneNum == 1){
             if(eastQueue.size() > 0){
