@@ -215,6 +215,8 @@ void *police(void*){
                 if(northQueue.size() == 0){
                     cout<<"north empty"<<endl;
                     laneEmpty = true;
+                }else{
+                    laneEmpty = false;
                 }
                 pthread_sleep(1);
             }  
@@ -227,6 +229,8 @@ void *police(void*){
                 if(eastQueue.size() == 0){
                     cout<<"east empty"<<endl;
                     laneEmpty = true;
+                }else{
+                    laneEmpty = false;
                 }
                 pthread_sleep(1);
             }
@@ -238,6 +242,8 @@ void *police(void*){
                 if(southQueue.size() == 0){
                     cout<<"south empty"<<endl;
                     laneEmpty = true;
+                }else{
+                    laneEmpty = false;
                 }
                 pthread_sleep(1);
             }
@@ -249,6 +255,8 @@ void *police(void*){
                 if(westQueue.size() == 0){
                     laneEmpty = true;
                     cout<<"west empty"<<endl;
+                }else{
+                    laneEmpty = false;
                 }
                 pthread_sleep(1);
             }
@@ -270,32 +278,45 @@ void *police(void*){
             max = westQueue.size();
             busyLane = 3;
         }
-        if(!northQueue.empty() && (time(0) - northQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
-            beating = true;
-            busyLane = 0;
-        }else if(!eastQueue.empty() && (time(0) - eastQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
-            beating = true;
-            busyLane = 1;
-        }else if(!southQueue.empty() && (time(0) - southQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
-            beating = true;
-            busyLane = 2;
-        }else if(!westQueue.empty() && (time(0) - westQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
-            beating = true;
-            busyLane = 3;
+
+        int impatient = 0;
+        if(!northQueue.empty()){
+            if((time(0) - northQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
+                beating = true;
+                busyLane = 0;
+                impatient++;
+            }
+        }
+        else if(!eastQueue.empty()){
+            if((time(0) - eastQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
+                beating = true;
+                busyLane = 1;
+                impatient++;
+            }
+        }else if(!southQueue.empty()){
+            if((time(0) - southQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
+                beating = true;
+                busyLane = 2;
+                impatient++;
+            }
+        }else if(!westQueue.empty()){
+            if((time(0) - westQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
+                beating = true;
+                busyLane = 3;
+                impatient++;
+            }
+        }else{
+            beating = false;
+        }
+
+        if(impatient == 0){
+            beating = false;
         }
         
         pthread_mutex_unlock(&street);
         if(max >= 5 || laneEmpty || beating){
-            // if(busyLane == laneNum){
-            //     if(busyLane == 3){
-            //         busyLane = 0;
-            //     }else {
-            //         busyLane++;
-            //     }
-            // }
+            
             laneNum = busyLane;
-            beating = false;
-            laneEmpty = false;
         }
     }
 }
