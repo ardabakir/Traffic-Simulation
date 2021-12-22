@@ -41,7 +41,7 @@ void* police(void*);
 using namespace std;
 int main(int argc, char **argv){
     srand((int)time(0));
-    void* status;
+    
     carID = 0;
     int sec = 0;
     double duration = 0;
@@ -114,10 +114,6 @@ int main(int argc, char **argv){
     }
 
     exit(0);
-    //pthread_sleep(15);
-
-    
-
     return 0;
 }
 
@@ -126,19 +122,21 @@ void addCar(int lane){
     pthread_mutex_lock(&cars);
     car.id = carID;
     car.arrival = time(0);
-    if(lane==0){
+    if(lane==0 ){
         if((double)rand() / (double)RAND_MAX<1-probability){
             carID++;
             car.lane = NORTH;
             northQueue.push(car);
+        }else{
+            pthread_sleep(19);
         }
-    }else if(lane == 1){
+    }else if(lane == 1 ){
         if((double)rand() / (double)RAND_MAX<probability){
             carID++;
             car.lane = EAST;
             eastQueue.push(car);
         }
-    }else if(lane == 2){
+    }else if(lane == 2 ){
         if((double)rand() / (double)RAND_MAX<probability){
             carID++;
             car.lane = SOUTH;
@@ -160,21 +158,26 @@ void *defaultLane(void *lane){
     while(true){
         long way;
         way = (long)lane;
-        pthread_mutex_lock(&street);
+        
         if(way == 0){
-            carNum = carID;
+            pthread_mutex_lock(&street);
             addCar(way);
-            if(carID == carNum){
-                pthread_sleep(19);
-            }
+            pthread_mutex_unlock(&street);
+           
         }else if(way == 1){
+            pthread_mutex_lock(&street);
             addCar(way);
+            pthread_mutex_unlock(&street);
         }else if(way == 2){
+            pthread_mutex_lock(&street);
             addCar(way);
+            pthread_mutex_unlock(&street);
         }else if(way == 3){
+            pthread_mutex_lock(&street);
             addCar(way);
+            pthread_mutex_unlock(&street);
         }
-        pthread_mutex_unlock(&street);
+        
         pthread_sleep(1);
     }
 }
@@ -184,6 +187,7 @@ void *police(void*){
     bool laneEmpty = false;
     int max = 0;
     int busyLane = 0;
+    bool beating = false;
     if (max < northQueue.size()){
         max = northQueue.size();
         busyLane = 0;
@@ -203,49 +207,53 @@ void *police(void*){
         pthread_mutex_lock(&street);
         if(laneNum == 0){
             if(northQueue.size() > 0){
+                Car car = northQueue.front();
+                car.departure = time(0);
                 northQueue.pop();
-                cout<<"car passed from north"<<endl;
-                pthread_sleep(1);
+                cout<<"car passed from north"<< endl;
+                
                 if(northQueue.size() == 0){
                     cout<<"north empty"<<endl;
                     laneEmpty = true;
                 }
+                pthread_sleep(1);
             }  
         }
         else if(laneNum == 1){
             if(eastQueue.size() > 0){
                 eastQueue.pop();
                 cout<<"car passed from east"<<endl;
-                pthread_sleep(1);
+                
                 if(eastQueue.size() == 0){
                     cout<<"east empty"<<endl;
                     laneEmpty = true;
                 }
+                pthread_sleep(1);
             }
         }
         else if(laneNum == 2){
             if(southQueue.size() > 0){
                 southQueue.pop();
                 cout<<"car passed from south"<<endl;
-                pthread_sleep(1);
                 if(southQueue.size() == 0){
                     cout<<"south empty"<<endl;
                     laneEmpty = true;
                 }
+                pthread_sleep(1);
             }
         }
         else if(laneNum == 3){
             if(westQueue.size() > 0){
                 westQueue.pop();
                 cout<<"car passed from west"<<endl;
-                pthread_sleep(1);
                 if(westQueue.size() == 0){
                     laneEmpty = true;
                     cout<<"west empty"<<endl;
                 }
+                pthread_sleep(1);
             }
         }
-        
+        max = 0;
         if (max < northQueue.size()){
             max = northQueue.size();
             busyLane = 0;
@@ -262,9 +270,32 @@ void *police(void*){
             max = westQueue.size();
             busyLane = 3;
         }
+        if(!northQueue.empty() && (time(0) - northQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
+            beating = true;
+            busyLane = 0;
+        }else if(!eastQueue.empty() && (time(0) - eastQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
+            beating = true;
+            busyLane = 1;
+        }else if(!southQueue.empty() && (time(0) - southQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
+            beating = true;
+            busyLane = 2;
+        }else if(!westQueue.empty() && (time(0) - westQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
+            beating = true;
+            busyLane = 3;
+        }
+        
         pthread_mutex_unlock(&street);
-        if(max >= 5 || laneEmpty){
+        if(max >= 5 || laneEmpty || beating){
+            // if(busyLane == laneNum){
+            //     if(busyLane == 3){
+            //         busyLane = 0;
+            //     }else {
+            //         busyLane++;
+            //     }
+            // }
             laneNum = busyLane;
+            beating = false;
+            laneEmpty = false;
         }
     }
 }
