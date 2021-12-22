@@ -7,9 +7,10 @@
 #include "pthread_sleep.c"
 #include <cstdio>
 #include <ctime>
-
+//defining the required threads
 #define NUM_THREADS 5
 
+//declaring pthreads
 pthread_t laneThreads[NUM_THREADS-1];
 pthread_t policeThread;
 pthread_mutex_t street;
@@ -17,10 +18,11 @@ pthread_mutex_t cars;
 pthread_cond_t carArrive;
 pthread_attr_t attributes;
 
+//lane numbers as enum
 enum lane{NORTH,EAST,SOUTH,WEST}; // 0,1,2,3
 
 int carID;
-
+//car struct to keep track of passing cars
 struct Car{
     int id;
     time_t arrival;
@@ -28,21 +30,22 @@ struct Car{
     time_t wait;
     lane lane;
 };
+//initializing queues to represent lanes
+std::queue<Car> northQueue;
+std::queue<Car> eastQueue;
+std::queue<Car> southQueue;
+std::queue<Car> westQueue;
 
-    std::queue<Car> northQueue;
-    std::queue<Car> eastQueue;
-    std::queue<Car> southQueue;
-    std::queue<Car> westQueue;
-
-int sim_time = 10;
-double probability = 0;
+//default -s -p and -t values 
+int sim_time = 60;
+double probability = 0.4;
 int time_stamp = 10;
 
 void* defaultLane(void* lane);
 void* police(void*);
 using namespace std;
 int main(int argc, char **argv){
-    srand((int)time(0));
+    srand((int)time(0));//defining seed for the rand function
     
     carID = 0;
     int sec = 0;
@@ -51,7 +54,7 @@ int main(int argc, char **argv){
     clock_t start = clock();
     clock_t prev_sec = clock();
 
-    //reading s and p from commandline
+    //reading s, p and t from commandline
     for(int i=1; i<argc; i++){
         if(strcmp(argv[i],"-s") == 0){
             sim_time = atoi(argv[i+1]);
@@ -63,6 +66,8 @@ int main(int argc, char **argv){
             time_stamp = atoi(argv[i+1]);
         }
     }
+
+    //assigning the first cars to the lanes
     Car car0;
     car0.id=carID;
     car0.lane = NORTH;
@@ -96,6 +101,7 @@ int main(int argc, char **argv){
     cout << "probability: " << probability << endl;
     cout << time_stamp << endl;
 
+    //initializing threads for lanes and the police
     pthread_create(&policeThread,NULL,police,NULL);
     pthread_create(&laneThreads[0],NULL,defaultLane,(void *)NORTH);
     pthread_create(&laneThreads[1],NULL,defaultLane,(void *)EAST);
@@ -103,9 +109,11 @@ int main(int argc, char **argv){
     pthread_create(&laneThreads[3],NULL,defaultLane,(void *)WEST);
     
     
-
+    //running until the duration exceeds the sim_time
     while(duration < sim_time){
         pthread_mutex_lock(&street);
+        //if the time passed is greater than one second update the previous second variable
+        //and check if required time passed to display the current state of the simulation
         if( clock() - prev_sec > CLOCKS_PER_SEC) {
             prev_sec = ++sec * CLOCKS_PER_SEC; 
 
@@ -141,13 +149,14 @@ int main(int argc, char **argv){
     exit(0);
     return 0;
 }
-
+//adding cars to the lanes with given probability
 void addCar(int lane){
     Car car;
     pthread_mutex_lock(&street);
     car.id = carID;
     car.arrival = time(0);
     if(lane==0 ){
+        
         if((double)rand() / (double)RAND_MAX<1-probability){
             carID++;
             car.lane = NORTH;
@@ -157,6 +166,7 @@ void addCar(int lane){
             pthread_sleep(19);
         }
     }else if(lane == 1 ){
+        //if random number is smaller than the defined probability new car is added to the lane
         if((double)rand() / (double)RAND_MAX<probability){
             carID++;
             car.lane = EAST;
@@ -164,6 +174,7 @@ void addCar(int lane){
             pthread_cond_signal(&carArrive);
         }
     }else if(lane == 2 ){
+        //if random number is smaller than the defined probability new car is added to the lane
         if((double)rand() / (double)RAND_MAX<probability){
             carID++;
             car.lane = SOUTH;
@@ -171,6 +182,7 @@ void addCar(int lane){
             pthread_cond_signal(&carArrive);
         }
     }else if(lane == 3){
+        //if random number is smaller than the defined probability new car is added to the lane
         if((double)rand() / (double)RAND_MAX<probability){
             carID++;
             car.lane = WEST;
@@ -185,34 +197,20 @@ using namespace std;
 void *defaultLane(void *lane){
     int carNum = 0;
     while(true){
+        //defining way variable to separate each thread from one another
         long way;
         way = (long)lane;
         
-        if(way == 0){
-            pthread_mutex_lock(&street);
-            addCar(way);
-            pthread_mutex_unlock(&street);
-           
-        }else if(way == 1){
-            pthread_mutex_lock(&street);
-            addCar(way);
-            pthread_mutex_unlock(&street);
-        }else if(way == 2){
-            pthread_mutex_lock(&street);
-            addCar(way);
-            pthread_mutex_unlock(&street);
-        }else if(way == 3){
-            pthread_mutex_lock(&street);
-            addCar(way);
-            pthread_mutex_unlock(&street);
-        }
+        pthread_mutex_lock(&street);
+        addCar(way);
+        pthread_mutex_unlock(&street);
         
         pthread_sleep(1);
     }
 }
 
 void *police(void*){
-
+    //openning files to write the logs into 
     FILE* carFile;
     carFile = fopen("car.log","w");
     fprintf(carFile, "\tCarID \t Direction \t Arrival-Time \t Cross-Time \t Wait-Time \n");
@@ -223,11 +221,13 @@ void *police(void*){
     fprintf(policeFile, "\tTime \t Event\n");
     fprintf(policeFile, "-------------------------\n");
     
-
+    // variables to keep track of which lane is being allowed to pass
     bool laneEmpty = false;
     int max = 0;
     int busyLane = 0;
     bool beating = false;
+    //finding the max number of cars waiting in a single lane
+    // if all are equal they are released according to the N>E>S>W importance
     if (max < northQueue.size()){
         max = northQueue.size();
         busyLane = 0;
@@ -246,11 +246,11 @@ void *police(void*){
        
         pthread_mutex_lock(&cars);
         int prev = carID;
-        
+        //if max is zero then there is no cars in tthe intersection and police starts playing with phone
         if(max == 0){
             time_t curr = time(0);
             string c_time = asctime(localtime(&curr));
-            
+            cout << "Phone" << endl;
             fprintf(policeFile,"%s \t Phone \n", c_time.substr(11,18).c_str());
             while(prev == carID){
                 pthread_cond_wait(&carArrive,&cars);
@@ -264,7 +264,9 @@ void *police(void*){
         }
         pthread_mutex_unlock(&cars);
         pthread_mutex_lock(&street);
+        //letting cars to pass according to the laneNum variable 
         if(laneNum == 0){
+            //if the queue is not empty front car is popped from queue and its stats are written to the log 
             if(northQueue.size() > 0){
                 Car car = northQueue.front();
                 car.departure = time(0);
@@ -337,6 +339,7 @@ void *police(void*){
                 pthread_sleep(1);
             }
         }
+        //after a car passes the max value is reinitialized to 0 and recalculated to see if any lane has more than 5 cars
         max = 0;
         if (max < northQueue.size()){
             max = northQueue.size();
@@ -354,7 +357,7 @@ void *police(void*){
             max = westQueue.size();
             busyLane = 3;
         }
-
+        //checking if there are any impatient drivers(who has been waiting for more than 20 secs)
         int impatient = 0;
         if(!northQueue.empty()){
             if((time(0) - northQueue.front().arrival)/(double) CLOCKS_PER_SEC >= 20){
@@ -390,6 +393,8 @@ void *police(void*){
         }
         
         pthread_mutex_unlock(&street);
+        //switching the current lane depending on the conditions
+        //if the conditions are not met then current lane continues
         if(max >= 5 || laneEmpty || beating){
             
             laneNum = busyLane;
